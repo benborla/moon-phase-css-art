@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Space Scene</title>
+    <style>
+        :root {
+            --moon-size: 100px;
+            --comet-tail-color: #FFD700;
+            --explosion-color: #FF4500;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        .space {
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            position: relative;
+        }
+
+        .star {
+            position: absolute;
+            background-color: #FFF;
+            border-radius: 50%;
+            animation: twinkle 3s infinite;
+        }
+
+        .moon {
+            width: var(--moon-size);
+            height: var(--moon-size);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 25% 25%, rgba(0,0,0,0.2) 10%, transparent 20%),
+                radial-gradient(circle at 75% 30%, rgba(0,0,0,0.2) 8%, transparent 16%),
+                radial-gradient(circle at 40% 60%, rgba(0,0,0,0.2) 12%, transparent 24%),
+                radial-gradient(circle at 70% 70%, rgba(0,0,0,0.2) 15%, transparent 30%),
+                #CCCCCC;
+            cursor: pointer;
+        }
+
+        .moon-phase {
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            animation: moonPhase 10s linear infinite;
+        }
+
+        .comet {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background-color: #FFF;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        .comet::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 1px;
+            background: linear-gradient(to left, var(--comet-tail-color), transparent);
+            transform: translateX(-20px);
+        }
+
+        .explosion {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background-color: var(--explosion-color);
+            box-shadow: 0 0 20px var(--explosion-color);
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes moonPhase {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+    </style>
+</head>
+<body>
+    <div class="space" id="space">
+        <div class="moon" id="moon">
+            <div class="moon-phase"></div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        'use strict';
+
+        const STAR_COUNT = 100;
+        const COMET_INTERVAL = 2000;
+        const COMET_SPEED = 1000;
+        const EXPLOSION_DURATION = 1000;
+        const EXPLOSION_SIZE = 100;
+
+        const spaceEl = document.getElementById('space');
+        const moonEl = document.getElementById('moon');
+
+        function createStar() {
+            const star = document.createElement('div');
+            star.className = 'star';
+            star.style.width = `${Math.random() * 3}px`;
+            star.style.height = star.style.width;
+            star.style.left = `${Math.random() * 100}%`;
+            star.style.top = `${Math.random() * 100}%`;
+            star.style.animationDelay = `${Math.random() * 3}s`;
+            return star;
+        }
+
+        function populateStars() {
+            const fragment = document.createDocumentFragment();
+            for (let i = 0; i < STAR_COUNT; i++) {
+                fragment.appendChild(createStar());
+            }
+            spaceEl.appendChild(fragment);
+        }
+
+        function getRandomEdgePosition() {
+            const side = Math.floor(Math.random() * 4);
+            switch(side) {
+                case 0: return { left: `${Math.random() * 100}%`, top: '0px' };
+                case 1: return { right: '0px', top: `${Math.random() * 100}%` };
+                case 2: return { left: `${Math.random() * 100}%`, bottom: '0px' };
+                case 3: return { left: '0px', top: `${Math.random() * 100}%` };
+            }
+        }
+
+        function createComet() {
+            const comet = document.createElement('div');
+            comet.className = 'comet';
+            Object.assign(comet.style, getRandomEdgePosition());
+            return comet;
+        }
+
+        function createExplosion(x, y) {
+            const explosion = document.createElement('div');
+            explosion.className = 'explosion';
+            explosion.style.left = `${x - EXPLOSION_SIZE / 2}px`;
+            explosion.style.top = `${y - EXPLOSION_SIZE / 2}px`;
+            spaceEl.appendChild(explosion);
+
+            explosion.animate([
+                { transform: 'scale(0)', opacity: 0.7 },
+                { transform: 'scale(1)', opacity: 0 }
+            ], {
+                duration: EXPLOSION_DURATION,
+                easing: 'ease-out'
+            }).onfinish = () => explosion.remove();
+        }
+
+        function animateComet(comet) {
+            const moonRect = moonEl.getBoundingClientRect();
+            const moonCenterX = moonRect.left + moonRect.width / 2;
+            const moonCenterY = moonRect.top + moonRect.height / 2;
+
+            const animation = comet.animate([
+                { transform: 'translate(0, 0)' },
+                { transform: `translate(${moonCenterX - comet.offsetLeft}px, ${moonCenterY - comet.offsetTop}px)` }
+            ], {
+                duration: COMET_SPEED,
+                easing: 'ease-in'
+            });
+
+            animation.onfinish = () => {
+                createExplosion(moonCenterX, moonCenterY);
+                comet.remove();
+            };
+        }
+
+        function launchComet() {
+            const comet = createComet();
+            spaceEl.appendChild(comet);
+            animateComet(comet);
+        }
+
+        function init() {
+            populateStars();
+            moonEl.addEventListener('mouseenter', launchComet);
+            setInterval(launchComet, COMET_INTERVAL);
+        }
+
+        // Start the application when the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', init);
+    })();
+    </script>
+</body>
+</html>
